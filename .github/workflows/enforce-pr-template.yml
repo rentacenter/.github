@@ -1,4 +1,4 @@
-name: Enforce PR Template (Reusable)
+name: Enforce PR Template
 
 on:
   workflow_call:
@@ -7,23 +7,51 @@ jobs:
   validate-pr-template:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate PR Description
+      - name: Validate PR Template
+      # Use GitHub script to inspect PR body
         uses: actions/github-script@v7
         with:
           script: |
-            const prBody = context.payload.pull_request.body || '';
-            const prNumber = context.payload.pull_request.number;
+            const pr = context.payload.pull_request;
+            const body = pr.body || "";
+            const prNumber = pr.number;
 
-            if (!prBody.trim()) {
-              core.setFailed('PR description is empty');
+            console.log("PR Body:", body);
+
+            const errors = [];
+
+            // Check Target Branch
+            const targetMatch = body.match(/\*\*Target Branch:\*\*\s*(.*)/);
+            if (!targetMatch || !targetMatch[1].trim()) {
+              errors.push("**Target Branch** is missing");
             }
 
-            if (!prBody.includes("Target Branch")) {
-              core.setFailed("Missing Target Branch in PR template");
+            // Check Source Branch
+            const sourceMatch = body.match(/\*\*Source Branch:\*\*\s*(.*)/);
+            if (!sourceMatch || !sourceMatch[1].trim()) {
+              errors.push("**Source Branch** is missing");
             }
 
-            if (!prBody.includes("Source Branch")) {
-              core.setFailed("Missing Source Branch in PR template");
-            }
+            if (errors.length > 0) {
+              let msg = "## PR Template Validation Failed\n\n";
+              msg += errors.join("\n") + "\n\n";
+              msg += "Please fill the missing values in the PR description.\n\n";
+              msg += "**Required format:**\n";
+              msg += "```\n";
+              msg += "## Branch Information\n";
+              msg += "**Target Branch:** <branch>\n";
+              msg += "**Source Branch:** <branch>\n";
+              msg += "```";
 
-            console.log("PR Template validation passed.");
+              // Add comment to PR
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: msg
+              });
+
+              core.setFailed("PR template missing required fields");
+            } else {
+              console.log("PR template validation passed");
+            }
