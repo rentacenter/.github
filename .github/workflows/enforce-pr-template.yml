@@ -1,8 +1,7 @@
-name: Enforce PR Template
+name: Enforce PR Template (Reusable)
 
 on:
-  pull_request:
-    types: [opened, edited, synchronize, reopened]
+  workflow_call:
 
 jobs:
   validate-pr-template:
@@ -14,123 +13,17 @@ jobs:
           script: |
             const prBody = context.payload.pull_request.body || '';
             const prNumber = context.payload.pull_request.number;
-            
-            console.log('='.repeat(60));
-            console.log('PR Template Validation');
-            console.log('='.repeat(60));
-            console.log('PR Number:', prNumber);
-            console.log('PR Body Length:', prBody.length);
-            console.log('PR Body:', prBody);
-            console.log('='.repeat(60));
-            
-            // Check if PR body is empty or only has template placeholders
-            if (!prBody || prBody.trim().length === 0) {
-              const message = '##PR Template Validation Failed\n\n' +
-                            '**Error:** PR description is empty.\n\n' +
-                            '**Action Required:** Please fill out the PR template with:\n' +
-                            '- Target Branch\n' +
-                            '- Source Branch\n' +
-                            '- Check all required checkboxes';
-              
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: message
-              });
-              
+
+            if (!prBody.trim()) {
               core.setFailed('PR description is empty');
-              return;
             }
-            
-            // Check for table format with branches filled
-            const hasTable = prBody.includes('| Field | Value |');
-            
-            // Extract target and source branch values from the table
-            const tableMatch = prBody.match(/\|\s*\*\*Target Branch\*\*[^|]*\|\s*`([^`]+)`/i);
-            const sourceMatch = prBody.match(/\|\s*\*\*Source Branch\*\*[^|]*\|\s*`([^`]+)`/i);
-            
-            let errors = [];
-            let warnings = [];
-            
-            // Check Target Branch
-            if (!tableMatch || !tableMatch[1] || tableMatch[1].trim() === '' || tableMatch[1].includes('_')) {
-              errors.push('**Target Branch** is not filled (still has underscores or is empty)');
-            } else {
-              console.log('Target Branch:', tableMatch[1]);
+
+            if (!prBody.includes("Target Branch")) {
+              core.setFailed("Missing Target Branch in PR template");
             }
-            
-            // Check Source Branch
-            if (!sourceMatch || !sourceMatch[1] || sourceMatch[1].trim() === '' || sourceMatch[1].includes('_')) {
-              errors.push('**Source Branch** is not filled (still has underscores or is empty)');
-            } else {
-              console.log('Source Branch:', sourceMatch[1]);
+
+            if (!prBody.includes("Source Branch")) {
+              core.setFailed("Missing Source Branch in PR template");
             }
-            
-            // Check checkboxes
-            const checkedBoxes = (prBody.match(/- \[x\]/gi) || []).length;
-            const totalBoxes = (prBody.match(/- \[ \]/gi) || []).length + checkedBoxes;
-            
-            console.log(`Checkboxes: ${checkedBoxes}/${totalBoxes} checked`);
-            
-            if (checkedBoxes === 0 && totalBoxes > 0) {
-              warnings.push('None of the checkboxes are checked');
-            }
-            
-            if (checkedBoxes < totalBoxes && totalBoxes > 0) {
-              warnings.push(`Only ${checkedBoxes} out of ${totalBoxes} checkboxes are checked`);
-            }
-            
-            // Generate validation result
-            if (errors.length > 0) {
-              let message = '##PR Template Validation Failed\n\n';
-              message += '**The following fields are required:**\n\n';
-              message += errors.join('\n') + '\n\n';
-              
-              if (warnings.length > 0) {
-                message += '**Warnings:**\n\n';
-                message += warnings.join('\n') + '\n\n';
-              }
-              
-              message += '---\n\n';
-              message += '**How to fix:**\n';
-              message += '1. Click "Edit" on your PR description\n';
-              message += '2. Replace the underscores (`____`) with actual branch names\n';
-              message += '3. Check all the boxes in the Pre-submission Checklist\n';
-              message += '4. Save your changes\n\n';
-              message += '**Example:**\n';
-              message += '```\n';
-              message += '| **Target Branch** (merging into) | `main` |\n';
-              message += '| **Source Branch** (merging from) | `feature/my-feature` |\n';
-              message += '```';
-              
-              // Post comment
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: message
-              });
-              
-              core.setFailed('PR template validation failed: ' + errors.join('; '));
-            } else {
-              let message = '##PR Template Validation Passed\n\n';
-              message += 'All required fields are filled:\n\n';
-              message += `- ✓ Target Branch: \`${tableMatch[1]}\`\n`;
-              message += `- ✓ Source Branch: \`${sourceMatch[1]}\`\n`;
-              
-              if (warnings.length > 0) {
-                message += '\n**Note:**\n';
-                message += warnings.join('\n');
-              }
-              
-              // Optional: Post success comment (comment out if too noisy)
-              // await github.rest.issues.createComment({
-              //   owner: context.repo.owner,
-              //   repo: context.repo.repo,
-              //   issue_number: prNumber,
-              //   body: message
-              // });
-              
-              console.log(message);
-            }
+
+            console.log("PR Template validation passed.");
