@@ -8,7 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate PR Template
-      # Use GitHub script to inspect PR body
         uses: actions/github-script@v7
         with:
           script: |
@@ -20,26 +19,31 @@ jobs:
 
             const errors = [];
 
-            // Check Target Branch
+            // Extract Target Branch
             const targetMatch = body.match(/\*\*Target Branch:\*\*\s*(.*)/);
-            if (!targetMatch || !targetMatch[1].trim()) {
+            const targetBranch = targetMatch ? targetMatch[1].trim() : "";
+
+            if (!targetBranch) {
               errors.push("**Target Branch** is missing");
+            } else if (!["master", "main"].includes(targetBranch)) {
+              errors.push("**Target Branch** must be either `master` or `main`");
             }
 
-            // Check Source Branch
+            // Extract Source Branch
             const sourceMatch = body.match(/\*\*Source Branch:\*\*\s*(.*)/);
-            if (!sourceMatch || !sourceMatch[1].trim()) {
+            const sourceBranch = sourceMatch ? sourceMatch[1].trim() : "";
+            if (!sourceBranch) {
               errors.push("**Source Branch** is missing");
             }
 
             if (errors.length > 0) {
               let msg = "## PR Template Validation Failed\n\n";
               msg += errors.join("\n") + "\n\n";
-              msg += "Please fill the missing values in the PR description.\n\n";
+              msg += "Please correct the PR description.\n\n";
               msg += "**Required format:**\n";
               msg += "```\n";
               msg += "## Branch Information\n";
-              msg += "**Target Branch:** <branch>\n";
+              msg += "**Target Branch:** master | main\n";
               msg += "**Source Branch:** <branch>\n";
               msg += "```";
 
@@ -51,7 +55,7 @@ jobs:
                 body: msg
               });
 
-              core.setFailed("PR template missing required fields");
+              core.setFailed("PR template missing or invalid fields");
             } else {
               console.log("PR template validation passed");
             }
